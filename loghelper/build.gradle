@@ -36,24 +36,3 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.1.0'
 
 }
-
-/*
-
-if (!hasProperty('uploadRepositoryUri')) project.ext.uploadRepositoryUri = 'file://' + new File(System.getProperty('user.home'), '.m2/repository').absolutePath
-if (!hasProperty('uploadSnapshotRepositoryUri')) project.ext.uploadSnapshotRepositoryUri = 'file://' + new File(System.getProperty('user.home'), '.m2/repository').absolutePath
-if (!hasProperty('uploadUser')) project.ext.uploadUser = ''
-if (!hasProperty('uploadPassword')) project.ext.uploadPassword = ''
-
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            repository(url: uri(uploadRepositoryUri)) {
-                authentication(userName: uploadUser, password: uploadPassword)
-            }
-            snapshotRepository(url: uri(uploadSnapshotRepositoryUri)) {
-                authentication(userName: uploadUser, password: uploadPassword)
-            }
-        }
-    }
-}
-*/
