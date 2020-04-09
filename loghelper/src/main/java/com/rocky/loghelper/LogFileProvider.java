@@ -1,0 +1,207 @@
+package com.rocky.loghelper;
+
+import android.content.ContentProvider;
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.MatrixCursor;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor;
+import android.provider.MediaStore;
+import android.provider.OpenableColumns;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.util.Arrays;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.zip.GZIPOutputStream;
+
+import androidx.annotation.NonNull;
+
+public class LogFileProvider extends ContentProvider {
+
+    private static final Logger logger = Logger.getLogger(LogFileProvider.class.getName());
+
+    /* package */ static final String EXPECTED_URI_PATH = "/logfilehelper/";
+
+    /* package */ static final String DESTINATION_FILENAME = "logfilehelper.log.gz";
+
+    private static final String[] COLUMNS = {
+            OpenableColumns.DISPLAY_NAME,
+            OpenableColumns.SIZE,
+            MediaStore.MediaColumns.DATA,
+            MediaStore.MediaColumns.MIME_TYPE
+
+    };
+
+    public LogFileProvider() {
+    }
+
+    public static Uri createFileUri(Context context, String tag) {
+        return new Uri.Builder()
+                .scheme("content")
+                .authority(context.getPackageName() + ".logfileprovider")
+                .path(EXPECTED_URI_PATH + tag)
+                .build();
+    }
+
+    public static File getDestinationFile(Context context) {
+        return new File(context.getCacheDir(), DESTINATION_FILENAME);
+    }
+
+    @Override
+    public boolean onCreate() {
+        return true;
+    }
+
+    private boolean isValidPath(Uri uri) {
+        return uri.getEncodedPath() != null && uri.getEncodedPath().startsWith(EXPECTED_URI_PATH);
+    }
+
+    @Override
+    public String getType(@NonNull Uri uri) {
+        if (isValidPath(uri)) {
+            return "application/x-gzip";
+        }
+
+        return null;
+    }
+
+    @Override
+    public Cursor query(@NonNull Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+        if (!isValidPath(uri)) {
+            throw new UnsupportedOperationException("file is unavailable");
+        }
+
+        String tag = "logfile";
+        List<String> segments = uri.getPathSegments();
+        if (segments.size() >= 2) {
+            tag = segments.get(1);
+        }
+
+        // consumer started a query, so build a logfile to serve
+        writeLogFileContents(tag);
+
+        if (projection == null) {
+            projection = COLUMNS;
+        }
+
+        String[] columns = new String[projection.length];
+        Object[] values = new Object[projection.length];
+        int i = 0;
+
+        i = getI(uri, projection, tag, columns, values, i);
+
+        columns = Arrays.copyOf(columns, i);
+        values = Arrays.copyOf(values, i);
+
+        MatrixCursor cursor = new MatrixCursor(columns, 1);
+        cursor.addRow(values);
+
+        return cursor;
+    }
+
+    private int getI(Uri uri, String[] projection, String tag, String[] columns, Object[] values, int i) {
+        for (String column : projection) {
+            i = getI(uri, tag, columns, values, i, column);
+        }
+        return i;
+    }
+
+    private int getI(Uri uri, String tag, String[] columns, Object[] values, int i, String column) {
+        Object value = null;
+
+        if (OpenableColumns.DISPLAY_NAME.equals(column)) {
+            value = tag + ".log.gz";
+        } else if (OpenableColumns.SIZE.equals(column)) {
+            try {
+                File file = getDestinationFile(getContext());
+                value = file.length();
+            } catch (Exception e) {
+                logger.log(Level.SEVERE, "failed to read file length", e);
+                value = 0;
+            }
+        }
+        // support for obscure apps, see: https://github.com/commonsguy/cwac-provider#supporting-legacy-apps
+        else if (MediaStore.MediaColumns.MIME_TYPE.equals(column)) {
+            value = getType(uri);
+        } else if (MediaStore.MediaColumns.DATA.equals(column)) {
+            value = uri.toString();
+        }
+
+        if (value != null) {
+            columns[i] = column;
+            values[i] = value;
+        }
+
+        i++;
+        return i;
+    }
+
+    @Override
+    public ParcelFileDescriptor openFile(@androidx.annotation.NonNull Uri uri, @androidx.annotation.NonNull String mode) throws FileNotFoundException {
+        if (!isValidPath(uri)) {
+            throw new UnsupportedOperationException("file is unavailable");
+        }
+
+        File file = getDestinationFile(getContext());
+        if (!file.exists()) {
+            throw new FileNotFoundException();
+        }
+
+        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
+    }
+
+    private void writeLogFileContents(String tag) {
+        Context context = getContext();
+        BufferedReader reader;
+        BufferedWriter writer;
+
+        try {
+            File cacheDir = context.getCacheDir();
+            if (cacheDir != null) {
+                File zipFile = getDestinationFile(context);
+                writer = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(zipFile))));
+                for (int i = 1; i >= 0; i--) {
+                    File logFile = new File(cacheDir.getAbsolutePath() + File.separator + tag + "." + i + ".log");
+                    if (logFile.exists()) {
+                        reader = new BufferedReader(new FileReader(logFile));
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            writer.write(line);
+                            writer.newLine();
+                        }
+                        reader.close();
+                    }
+                }
+                writer.close();
+            }
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public Uri insert(@NonNull Uri uri, ContentValues values) {
+        throw new UnsupportedOperationException("content provider is read-only");
+    }
+
+    @Override
+    public int delete(@NonNull Uri uri, String selection, String[] selectionArgs) {
+        throw new UnsupportedOperationException("content provider is read-only");
+    }
+
+    @Override
+    public int update(@NonNull Uri uri, ContentValues values, String selection,
+                      String[] selectionArgs) {
+        throw new UnsupportedOperationException("content provider is read-only");
+    }
+}

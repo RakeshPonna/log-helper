@@ -1,0 +1,59 @@
+apply plugin: 'com.android.library'
+apply plugin: 'maven'
+
+group = 'com.rocky.loghelper'
+archivesBaseName = 'loghelper-android'
+version = '1.0'
+
+android {
+    compileSdkVersion 29
+    buildToolsVersion "29.0.2"
+
+    defaultConfig {
+        minSdkVersion 19
+        targetSdkVersion 29
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+
+}
+
+/*
+
+if (!hasProperty('uploadRepositoryUri')) project.ext.uploadRepositoryUri = 'file://' + new File(System.getProperty('user.home'), '.m2/repository').absolutePath
+if (!hasProperty('uploadSnapshotRepositoryUri')) project.ext.uploadSnapshotRepositoryUri = 'file://' + new File(System.getProperty('user.home'), '.m2/repository').absolutePath
+if (!hasProperty('uploadUser')) project.ext.uploadUser = ''
+if (!hasProperty('uploadPassword')) project.ext.uploadPassword = ''
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: uri(uploadRepositoryUri)) {
+                authentication(userName: uploadUser, password: uploadPassword)
+            }
+            snapshotRepository(url: uri(uploadSnapshotRepositoryUri)) {
+                authentication(userName: uploadUser, password: uploadPassword)
+            }
+        }
+    }
+}
+*/
